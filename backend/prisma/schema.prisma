@@ -1,0 +1,270 @@
+// Prisma Schema for Thrive App
+// A compassionate community for people with terminal illnesses
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String
+  alias         String?  // Privacy-first alias
+  bio           String?  // "What keeps me going"
+  isAnonymous   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  profile       Profile?
+  posts         Post[]
+  comments      Comment[]
+  reactions     Reaction[]
+  following     Follow[] @relation("UserFollowing")
+  followers     Follow[] @relation("UserFollowers")
+  sentMessages  Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Recipient")
+  groupMembers  GroupMember[]
+  medications   Medication[]
+  appointments  Appointment[]
+  reminders     Reminder[]
+  encouragementSubscriptions EncouragementSubscription[]
+
+  @@map("users")
+}
+
+// User Profile (Extended profile information)
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  illnessTags String[] // User-controlled illness tags
+  tonePreference String? // Spiritual, Motivational, Grounded
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+// Follow System
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// Posts
+model Post {
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  content     String
+  prompt      String?  // Optional prompt like "What gave you strength today?"
+  isFlagged   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comments    Comment[]
+  reactions   Reaction[]
+
+  @@map("posts")
+}
+
+// Comments
+model Comment {
+  id          String   @id @default(cuid())
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  content     String
+  isFlagged   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("comments")
+}
+
+// Reactions (Gentle reactions: ❤️, 🤝, 🌱)
+model Reaction {
+  id          String   @id @default(cuid())
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        String   // "heart", "handshake", "sprout"
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@map("reactions")
+}
+
+// Messages (1-on-1 messaging)
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User     @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  content     String
+  isRead      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+
+  @@map("messages")
+}
+
+// Group Chats
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // "condition", "topic"
+  topic       String?  // faith, music, parenting, acceptance, fear, hope
+  isModerated Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  groupMessages GroupMessage[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt    DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model GroupMessage {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  senderId    String
+  
+  content     String
+  isFlagged   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+
+  @@map("group_messages")
+}
+
+// Medications
+model Medication {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  dosage      String?
+  schedule    String   // JSON string with time-based schedule
+  notes       String?  // Side effects, mood tracking
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reminders   Reminder[]
+
+  @@map("medications")
+}
+
+// Appointments
+model Appointment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  type        String   // "doctor", "therapy", "self-care"
+  dateTime    DateTime
+  location    String?
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("appointments")
+}
+
+// Reminders (Medication, hydration, rest, journaling)
+model Reminder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationId String?
+  medication  Medication? @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  
+  type        String   // "medication", "hydration", "rest", "journaling"
+  time        String   // Time of day
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("reminders")
+}
+
+// Daily Encouragement Subscriptions
+model EncouragementSubscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tone        String   // "spiritual", "motivational", "grounded"
+  isActive    Boolean  @default(true)
+  preferredTime String? // Preferred time for notifications
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId])
+  @@map("encouragement_subscriptions")
+}
+
+// Content Moderation
+model FlaggedContent {
+  id          String   @id @default(cuid())
+  contentType String   // "post", "comment", "message"
+  contentId   String
+  reportedBy  String
+  reason      String?
+  status      String   @default("pending") // "pending", "reviewed", "resolved"
+  
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+
+  @@map("flagged_content")
+}
+
