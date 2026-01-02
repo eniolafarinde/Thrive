@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 function Home() {
@@ -19,6 +19,12 @@ function Home() {
               <h1 className="text-2xl font-bold text-primary-600">🌱 Thrive</h1>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                to="/chat"
+                className="btn-primary text-sm"
+              >
+                💬 Messages
+              </Link>
               <span className="text-gray-700">
                 Welcome, {user?.alias || user?.name}!
               </span>
