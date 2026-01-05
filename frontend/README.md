@@ -98,3 +98,4 @@ The frontend connects to the backend API at `http://localhost:5001/api` (configu
 - Medication reminders
 - Daily encouragement features
 
+

@@ -169,7 +169,9 @@ function Chat() {
               >
                 ← Back
               </button>
-              <h1 className="text-2xl font-bold text-primary-600">💬 Messages</h1>
+              <h1 className="text-2xl font-bold text-primary-600">
+                <i className="fas fa-comments mr-2"></i>Messages
+              </h1>
             </div>
             <div className="flex items-center">
               <span className="text-gray-700">{user?.alias || user?.name}</span>

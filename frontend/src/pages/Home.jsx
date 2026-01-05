@@ -16,14 +16,16 @@ function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary-600">🌱 Thrive</h1>
+              <h1 className="text-2xl font-bold text-primary-600">
+                <i className="fas fa-seedling mr-2"></i>Thrive
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <Link
                 to="/chat"
                 className="btn-primary text-sm"
               >
-                💬 Messages
+                <i className="fas fa-comments mr-2"></i>Messages
               </Link>
               <span className="text-gray-700">
                 Welcome, {user?.alias || user?.name}!
@@ -52,7 +54,9 @@ function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="card">
-            <div className="text-4xl mb-4">🤍</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-heart"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Community & Connection</h3>
             <p className="text-gray-600">
               Connect with others who understand your journey. Share your story
@@ -61,7 +65,9 @@ function Home() {
           </div>
 
           <div className="card">
-            <div className="text-4xl mb-4">💬</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-comments"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Chat & Support</h3>
             <p className="text-gray-600">
               Join support circles and have meaningful conversations with others
@@ -70,7 +76,9 @@ function Home() {
           </div>
 
           <div className="card">
-            <div className="text-4xl mb-4">🌤</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-sun"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Daily Encouragement</h3>
             <p className="text-gray-600">
               Receive gentle daily reminders and affirmations tailored to your
@@ -79,7 +87,9 @@ function Home() {
           </div>
 
           <div className="card">
-            <div className="text-4xl mb-4">📅</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-calendar-alt"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Reminders</h3>
             <p className="text-gray-600">
               Never miss important medications or appointments with helpful
@@ -88,7 +98,9 @@ function Home() {
           </div>
 
           <div className="card">
-            <div className="text-4xl mb-4">🔔</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-bell"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Stay Connected</h3>
             <p className="text-gray-600">
               Get notified about new messages, comments, and community updates.
@@ -96,7 +108,9 @@ function Home() {
           </div>
 
           <div className="card">
-            <div className="text-4xl mb-4">🔐</div>
+            <div className="text-4xl mb-4 text-primary-600">
+              <i className="fas fa-shield-alt"></i>
+            </div>
             <h3 className="text-xl font-semibold mb-2">Safe & Private</h3>
             <p className="text-gray-600">
               Your privacy and safety are our top priorities. Share only what

@@ -268,3 +268,4 @@ model FlaggedContent {
   @@map("flagged_content")
 }
 
+

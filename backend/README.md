@@ -158,3 +158,4 @@ The server uses `nodemon` for auto-reloading during development. Changes to file
 - CORS is configured for the frontend URL
 - Environment variables should never be committed to git
 
+
