@@ -11,13 +11,17 @@ function Chat() {
   const [selectedUser, setSelectedUser] = useState(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
+  const [messageInput, setMessageInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showUserList, setShowUserList] = useState(false)
   const [users, setUsers] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [showUserSuggestions, setShowUserSuggestions] = useState(false)
+  const [suggestedUsers, setSuggestedUsers] = useState([])
   const messagesEndRef = useRef(null)
+  const inputRef = useRef(null)
   const [pollingInterval, setPollingInterval] = useState(null)
 
   // Scroll to bottom when messages change
@@ -89,6 +93,46 @@ function Chat() {
     await loadUsers(searchTerm)
   }
 
+  // Real-time search as user types (with debounce)
+  useEffect(() => {
+    if (!showUserList) return
+
+    const timeoutId = setTimeout(() => {
+      loadUsers(searchTerm)
+    }, 300) // Debounce: wait 300ms after user stops typing
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, showUserList])
+
+  // iMessage-style: Search users as they type in message input when no conversation selected
+  useEffect(() => {
+    if (selectedUser) {
+      setShowUserSuggestions(false)
+      setSuggestedUsers([])
+      return
+    }
+
+    const searchText = messageInput.trim()
+    if (searchText.length === 0) {
+      setShowUserSuggestions(false)
+      setSuggestedUsers([])
+      return
+    }
+
+    // If it looks like a username/email search, show suggestions
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await userService.getUsers(searchText)
+        setSuggestedUsers(response.data.users.slice(0, 5)) // Limit to 5 suggestions
+        setShowUserSuggestions(true)
+      } catch (error) {
+        console.error('Error searching users:', error)
+      }
+    }, 300) // Debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [messageInput, selectedUser])
+
   const loadMessages = async (otherUserId) => {
     try {
       const response = await messageService.getMessages(otherUserId)
@@ -104,12 +148,43 @@ function Chat() {
     setShowUserList(false)
   }
 
+  const handleSelectSuggestedUser = async (user) => {
+    setSelectedUser(user)
+    setMessageInput('')
+    setShowUserSuggestions(false)
+    setSuggestedUsers([])
+    // Load messages with this user (will be empty if new conversation)
+    await loadMessages(user.id)
+    // Focus the message input
+    if (inputRef.current) {
+      inputRef.current.focus()
+    }
+  }
+
   const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedUser) return
+    
+    // If no user selected but there's input, check if we should select a user first
+    if (!selectedUser && messageInput.trim()) {
+      const trimmed = messageInput.trim()
+      // Check if input matches a user exactly or is an email
+      const matchingUser = suggestedUsers.find(
+        (u) =>
+          u.email.toLowerCase() === trimmed.toLowerCase() ||
+          (u.alias && u.alias.toLowerCase() === trimmed.toLowerCase()) ||
+          u.name.toLowerCase() === trimmed.toLowerCase()
+      )
+      
+      if (matchingUser) {
+        await handleSelectSuggestedUser(matchingUser)
+        return
+      }
+    }
 
-    const content = newMessage.trim()
-    setNewMessage('')
+    if (!messageInput.trim() || !selectedUser) return
+
+    const content = messageInput.trim()
+    setMessageInput('')
     setSending(true)
 
     try {
@@ -120,9 +195,18 @@ function Chat() {
       await loadConversations()
     } catch (error) {
       console.error('Error sending message:', error)
-      setNewMessage(content) // Restore message on error
+      setMessageInput(content) // Restore message on error
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleInputChange = (e) => {
+    const value = e.target.value
+    setMessageInput(value)
+    // If user clears input while in a conversation, keep the conversation open
+    if (value === '' && selectedUser) {
+      // Keep conversation open
     }
   }
 
@@ -199,20 +283,33 @@ function Chat() {
               </button>
             </div>
             {showUserList && (
-              <form onSubmit={handleSearchUsers} className="mb-3">
-                <div className="flex space-x-2">
+              <div className="mb-3">
+                <div className="relative">
+                  <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search users..."
-                    className="flex-1 input-field text-sm"
+                    placeholder="Search by username or email..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-300 outline-none transition-all text-sm"
                   />
-                  <button type="submit" className="btn-primary text-sm px-3 py-1">
-                    Search
-                  </button>
+                  {searchTerm && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('')
+                        loadUsers('')
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  )}
                 </div>
-              </form>
+                <p className="text-xs text-gray-500 mt-2 px-1">
+                  <i className="fas fa-info-circle mr-1"></i>
+                  Search by username (alias), name, or email address
+                </p>
+              </div>
             )}
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -223,10 +320,13 @@ function Chat() {
                   <p className="mt-2 text-sm text-gray-500">Loading users...</p>
                 </div>
               ) : users.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <p className="text-sm">No users found</p>
-                  <p className="text-xs mt-1">Try a different search term</p>
-                </div>
+              <div className="p-8 text-center text-gray-500">
+                <i className="fas fa-user-slash text-3xl mb-3 text-gray-300"></i>
+                <p className="text-sm font-medium">No users found</p>
+                <p className="text-xs mt-1">
+                  {searchTerm ? 'Try searching by username, name, or email' : 'Search for users to start a conversation'}
+                </p>
+              </div>
               ) : (
                 <div className="divide-y divide-purple-100">
                   {users.map((user) => (
@@ -236,20 +336,34 @@ function Chat() {
                       className="w-full p-4 text-left hover:bg-primary-50 transition-colors"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center">
-                          <span className="text-primary-700 font-semibold">
+                        <div className="h-12 w-12 rounded-full bg-primary-200 flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary-700 font-semibold text-lg">
                             {(user.alias || user.name).charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {user.alias || user.name}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-semibold text-gray-900 truncate">
+                              {user.alias || user.name}
+                            </p>
+                            {user.alias && (
+                              <span className="text-xs text-gray-400">({user.name})</span>
+                            )}
+                          </div>
+                          {user.email && (
+                            <p className="text-xs text-primary-600 truncate mt-1">
+                              <i className="fas fa-envelope mr-1"></i>
+                              {user.email}
+                            </p>
+                          )}
                           {user.bio && (
                             <p className="text-xs text-gray-500 truncate mt-1">
                               {user.bio}
                             </p>
                           )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          <i className="fas fa-chevron-right text-gray-400"></i>
                         </div>
                       </div>
                     </button>
@@ -258,7 +372,8 @@ function Chat() {
               )
             ) : conversations.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <p className="text-lg mb-2">No conversations yet</p>
+                <i className="fas fa-inbox text-4xl mb-4 text-gray-300"></i>
+                <p className="text-lg mb-2 font-medium">No conversations yet</p>
                 <p className="text-sm mb-4">Click "+ New" to find users and start chatting!</p>
                 <button
                   onClick={() => {
@@ -267,7 +382,7 @@ function Chat() {
                   }}
                   className="btn-primary text-sm"
                 >
-                  Find Users
+                  <i className="fas fa-user-plus mr-2"></i>Find Users
                 </button>
               </div>
             ) : (
@@ -312,79 +427,150 @@ function Chat() {
         </div>
 
         {/* Chat Window */}
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-white relative">
           {selectedUser ? (
             <>
               {/* Chat Header */}
               <div className="p-4 border-b border-purple-100 bg-primary-50">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {selectedUser.alias || selectedUser.name}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {selectedUser.alias || selectedUser.name}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setSelectedUser(null)
+                      setMessages([])
+                      setMessageInput('')
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
               </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => {
-                  const isOwnMessage = message.sender.id === user.id
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-                    >
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="text-center">
+                      <i className="fas fa-comments text-4xl mb-2"></i>
+                      <p className="text-sm">No messages yet. Start the conversation!</p>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const isOwnMessage = message.sender.id === user.id
+                    return (
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          isOwnMessage
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-purple-100 text-gray-900'
-                        }`}
+                        key={message.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                       >
-                        <p className="text-sm">{message.content}</p>
-                        <p
-                          className={`text-xs mt-1 ${
-                            isOwnMessage ? 'text-primary-100' : 'text-gray-500'
+                        <div
+                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                            isOwnMessage
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-purple-100 text-gray-900'
                           }`}
                         >
-                          {formatTime(message.createdAt)}
-                        </p>
+                          <p className="text-sm">{message.content}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              isOwnMessage ? 'text-primary-100' : 'text-gray-500'
+                            }`}
+                          >
+                            {formatTime(message.createdAt)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
-
-              {/* Message Input */}
-              <form
-                onSubmit={handleSendMessage}
-                className="p-4 border-t border-purple-100 bg-primary-50"
-              >
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 input-field"
-                    disabled={sending}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newMessage.trim() || sending}
-                    className="btn-primary px-6"
-                  >
-                    {sending ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
-              </form>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-gray-400">
               <div className="text-center">
-                <p className="text-xl mb-2">Select a conversation</p>
-                <p className="text-sm">Choose a conversation from the list to start chatting</p>
+                <i className="fas fa-comments text-5xl mb-4 text-gray-300"></i>
+                <p className="text-xl mb-2 font-medium text-gray-600">New Message</p>
+                <p className="text-sm">Type a username or email to start a conversation</p>
               </div>
             </div>
           )}
+
+          {/* User Suggestions Dropdown */}
+          {showUserSuggestions && suggestedUsers.length > 0 && !selectedUser && (
+            <div className="absolute bottom-20 left-4 right-4 bg-white border border-purple-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+              {suggestedUsers.map((suggestedUser) => (
+                <button
+                  key={suggestedUser.id}
+                  onClick={() => handleSelectSuggestedUser(suggestedUser)}
+                  className="w-full p-3 text-left hover:bg-primary-50 transition-colors border-b border-purple-100 last:border-b-0"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary-700 font-semibold">
+                        {(suggestedUser.alias || suggestedUser.name).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">
+                        {suggestedUser.alias || suggestedUser.name}
+                      </p>
+                      {suggestedUser.email && (
+                        <p className="text-xs text-gray-500 truncate">
+                          {suggestedUser.email}
+                        </p>
+                      )}
+                    </div>
+                    <i className="fas fa-chevron-right text-gray-400"></i>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Message Input (Always visible, like iMessage) */}
+          <form
+            onSubmit={handleSendMessage}
+            className="p-4 border-t border-purple-100 bg-primary-50"
+          >
+            <div className="flex space-x-2 relative">
+              <input
+                ref={inputRef}
+                type="text"
+                value={messageInput}
+                onChange={handleInputChange}
+                placeholder={
+                  selectedUser
+                    ? 'Type a message...'
+                    : 'Enter username or email to start a conversation...'
+                }
+                className="flex-1 input-field"
+                disabled={sending}
+              />
+              {selectedUser && (
+                <button
+                  type="submit"
+                  disabled={!messageInput.trim() || sending}
+                  className="btn-primary px-6"
+                >
+                  {sending ? (
+                    <i className="fas fa-spinner fa-spin"></i>
+                  ) : (
+                    <i className="fas fa-paper-plane"></i>
+                  )}
+                </button>
+              )}
+            </div>
+            {!selectedUser && messageInput && suggestedUsers.length === 0 && (
+              <p className="text-xs text-gray-500 mt-2 px-2">
+                <i className="fas fa-info-circle mr-1"></i>
+                No user found. Try a different username or email.
+              </p>
+            )}
+          </form>
         </div>
       </div>
     </div>

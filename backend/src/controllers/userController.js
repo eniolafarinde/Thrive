@@ -30,6 +30,7 @@ const getUsers = async (req, res) => {
         id: true,
         name: true,
         alias: true,
+        email: true,
         bio: true,
         createdAt: true,
       },
