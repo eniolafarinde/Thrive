@@ -27,6 +27,12 @@ function Home() {
               >
                 <i className="fas fa-comments mr-2"></i>Messages
               </Link>
+              <Link
+                to="/profile"
+                className="btn-secondary text-sm"
+              >
+                <i className="fas fa-user mr-2"></i>Profile
+              </Link>
               <span className="text-gray-700">
                 Welcome, {user?.alias || user?.name}!
               </span>
@@ -118,30 +124,6 @@ function Home() {
             </p>
           </div>
         </div>
-
-        {user && (
-          <div className="mt-12 card max-w-2xl mx-auto">
-            <h3 className="text-xl font-semibold mb-4">Your Profile</h3>
-            <div className="space-y-2">
-              <p>
-                <span className="font-medium">Name:</span> {user.name}
-              </p>
-              {user.alias && (
-                <p>
-                  <span className="font-medium">Alias:</span> {user.alias}
-                </p>
-              )}
-              {user.bio && (
-                <p>
-                  <span className="font-medium">Bio:</span> {user.bio}
-                </p>
-              )}
-              <p>
-                <span className="font-medium">Email:</span> {user.email}
-              </p>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   )
